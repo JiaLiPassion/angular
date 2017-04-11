@@ -105,7 +105,7 @@ if [[ ${TRAVIS:-} ]]; then
 fi
 
 # if NGBUILDS_IO_KEY is not set, use SAUCE_ACCESS_KEY 
-export NGBUILDS_IO_KEY=${NGBUILDS_IO_KEY:-$SAUCE_ACCESS_KEY}
+# export NGBUILDS_IO_KEY=${NGBUILDS_IO_KEY:-$SAUCE_ACCESS_KEY}
 
 #######################
 # PREEXISTING GLOBALS #
