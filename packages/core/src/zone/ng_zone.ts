@@ -152,16 +152,26 @@ export class NgZone {
 
     // replace Zone.root with angular zone
     const angularZone = self._inner;
-    let findZone: Zone|null = angularZone;
-    while (findZone) {
-      if (findZone.parent === self._outer) {
-        break;
+    const currentDesc = Object.getOwnPropertyDescriptor(Zone, 'current');
+    if (!currentDesc) {
+      return;
+    }
+    const currentDescGet = currentDesc.get;
+    if (!currentDescGet) {
+      return;
+    }
+    const rootZone = Zone.root;
+    Object.defineProperty(Zone, 'current', {
+      configurable: true,
+      enumerable: true,
+      get: function() {
+        const currentZone = currentDescGet.apply(this, arguments as any);
+        if (currentZone === rootZone) {
+          return angularZone;
+        }
+        return currentZone;
       }
-      findZone = findZone.parent;
-    }
-    if (findZone) {
-      (findZone as any)._parent = null;
-    }
+    });
   }
 
   static isInAngularZone(): boolean { return Zone.current.get('isAngularZone') === true; }
