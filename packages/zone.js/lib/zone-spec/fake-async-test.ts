@@ -739,13 +739,11 @@ class FakeAsyncTestZoneSpec implements FakeAsyncTestSpecType {
 
 Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) => {
   const FakeAsyncTestZoneSpec = Zone && (Zone as any)['FakeAsyncTestZoneSpec'];
-  type ProxyZoneSpecType = {
+  type ProxyZoneSpec = {
     setDelegate(delegateSpec: ZoneSpec): void; getDelegate(): ZoneSpec; resetDelegate(): void;
   };
-
-  function getProxyZoneSpec(): {get(): ProxyZoneSpecType; assertPresent: () => ProxyZoneSpecType} {
-    return Zone && (Zone as any)['ProxyZoneSpec'];
-  }
+  const ProxyZoneSpec: {get(): ProxyZoneSpec; assertPresent: () => ProxyZoneSpec} =
+      Zone && (Zone as any)['ProxyZoneSpec'];
 
   let _fakeAsyncTestZoneSpec: FakeAsyncTestSpecType | null = null;
 
@@ -761,7 +759,7 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
     }
     _fakeAsyncTestZoneSpec = null;
     // in node.js testing we may not have ProxyZoneSpec in which case there is nothing to reset.
-    getProxyZoneSpec() && getProxyZoneSpec().assertPresent().resetDelegate();
+    ProxyZoneSpec && ProxyZoneSpec.assertPresent().resetDelegate();
   }
 
   /**
@@ -785,12 +783,6 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
   function fakeAsync(fn: Function): (...args: any[]) => any {
     // Not using an arrow function to preserve context passed from call site
     const fakeAsyncFn: any = function(this: unknown, ...args: any[]) {
-      const ProxyZoneSpec = getProxyZoneSpec();
-      if (!ProxyZoneSpec) {
-        throw new Error(
-            'ProxyZoneSpec is needed for the async() test helper but could not be found. ' +
-            'Please make sure that your environment includes zone.js/dist/proxy.js');
-      }
       const proxyZoneSpec = ProxyZoneSpec.assertPresent();
       if (Zone.current.get('FakeAsyncTestZoneSpec')) {
         throw new Error('fakeAsync() calls can not be nested');
@@ -882,7 +874,7 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
    */
   function setFakeSystemTime(time: number): void {
     const zoneSpec = _getFakeAsyncZoneSpec();
-    zoneSpec.setFakeBaseSystemTime(time);
+    zoneSpec.setCurrentRealTime(time);
   }
 
   /**
@@ -961,7 +953,6 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
    */
   function discardPeriodicTasks(): void {
     const zoneSpec = _getFakeAsyncZoneSpec();
-    const pendingTimers = zoneSpec.pendingPeriodicTimers;
     zoneSpec.pendingPeriodicTimers.length = 0;
   }
 
