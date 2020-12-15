@@ -1240,7 +1240,20 @@ class Log {
 const resolvedPromise = Promise.resolve(null);
 const ProxyZoneSpec: {assertPresent: () => void} = (Zone as any)['ProxyZoneSpec'];
 const fakeAsyncTestModule = (Zone as any)[Zone.__symbol__('fakeAsyncTest')];
-const {fakeAsync, tick, discardPeriodicTasks, flush, flushMicrotasks} = fakeAsyncTestModule;
+const {
+  fakeAsync,
+  tick,
+  discardPeriodicTasks,
+  flush,
+  flushMicrotasks,
+  getFakeSystemTime,
+  setFakeSystemTime,
+  getRealSystemTime,
+  flushOnlyPendingTasks,
+  tickToNext,
+  discardAllTasks,
+  getTaskCount
+} = fakeAsyncTestModule;
 
 const fakeAsyncTest = Zone.getFakeAsyncTest!();
 
@@ -1251,8 +1264,9 @@ const fakeAsyncTest = Zone.getFakeAsyncTest!();
       expect(fakeAsyncTest.discardAllTasks).toEqual(fakeAsyncTestModule.discardAllTasks);
       expect(fakeAsyncTest.discardPeriodicTasks).toEqual(fakeAsyncTestModule.discardPeriodicTasks);
       expect(fakeAsyncTest.flush).toEqual(fakeAsyncTestModule.flush);
-      expect(fakeAsyncTest.flushMicrotasks).toEqual(fakeAsyncTestModule.flushMicroTasks);
-      expect(fakeAsyncTest.flushOnlyPendingTasks).toEqual(fakeAsyncTestModule.flushOnlyPendingTasks);
+      expect(fakeAsyncTest.flushMicrotasks).toEqual(fakeAsyncTestModule.flushMicrotasks);
+      expect(fakeAsyncTest.flushOnlyPendingTasks)
+          .toEqual(fakeAsyncTestModule.flushOnlyPendingTasks);
       expect(fakeAsyncTest.getFakeSystemTime).toEqual(fakeAsyncTestModule.getFakeSystemTime);
       expect(fakeAsyncTest.setFakeSystemTime).toEqual(fakeAsyncTestModule.setFakeSystemTime);
       expect(fakeAsyncTest.getTaskCount).toEqual(fakeAsyncTestModule.getTaskCount);
@@ -1685,4 +1699,82 @@ const fakeAsyncTest = Zone.getFakeAsyncTest!();
       expect(state).toEqual('works');
     });
   });
+
+  describe(
+      'util methods inspired from jest', () => {it('getFakeSystemTime', fakeAsync(() => {
+                                                     let d = getRealSystemTime();
+                                                     setFakeSystemTime(d);
+                                                     expect(Date.now()).toEqual(d);
+                                                     expect(getFakeSystemTime()).toEqual(d);
+                                                     let j = 0;
+                                                     for (let i = 0; i < 100000; i++) {
+                                                       j++;
+                                                     }
+                                                     expect(j).toEqual(100000);
+                                                     expect(getRealSystemTime()).not.toEqual(d);
+                                                     d = getRealSystemTime();
+                                                     let timeoutTriggered = false;
+                                                     setTimeout(() => {
+                                                       timeoutTriggered = true;
+                                                     }, 100);
+                                                     setFakeSystemTime(d);
+                                                     expect(getFakeSystemTime()).toEqual(d);
+                                                     tick(100);
+                                                     expect(timeoutTriggered).toBe(true);
+                                                     expect(Date.now()).toEqual(d + 100);
+                                                     expect(getFakeSystemTime()).toEqual(d + 100);
+                                                   }))});
+
+  it('flushOnlyPendingTasks should run all macroTasks and ignore new spawn macroTasks',
+     fakeAsync(() => {
+       const logs: any[] = [];
+       Promise.resolve(1).then(v => logs.push(v));
+       let nestedTimeoutId;
+       setTimeout(() => {
+         logs.push('timeout');
+         nestedTimeoutId = setTimeout(() => {logs.push('new timeout')});
+       });
+       expect(logs).toEqual([]);
+       flushOnlyPendingTasks();
+       expect(logs).toEqual([1, 'timeout']);
+       clearTimeout(nestedTimeoutId);
+     }));
+
+  it('tickToNext() should tick to the next (steps) timeout correctly', fakeAsync(() => {
+       const logs: any[] = [];
+       setTimeout(() => {logs.push('timeout1')}, 100);
+       setTimeout(() => {logs.push('timeout11')}, 100);
+       setTimeout(() => {logs.push('timeout2')}, 200);
+       setTimeout(() => {logs.push('timeout3')}, 300);
+       expect(logs).toEqual([]);
+       tickToNext();
+       expect(logs).toEqual(['timeout1', 'timeout11']);
+       tickToNext(2);
+       expect(logs).toEqual(['timeout1', 'timeout11', 'timeout2', 'timeout3']);
+     }));
+
+  it('discardAllTasks should clear all tasks', fakeAsync(() => {
+       const logs: any[] = [];
+       setTimeout(() => {logs.push('timeout1')}, 100);
+       setTimeout(() => {logs.push('timeout2')}, 200);
+       setInterval(() => {logs.push('interval')}, 100);
+       expect(logs).toEqual([]);
+       discardAllTasks();
+       tick(300);
+       expect(logs).toEqual([]);
+     }));
+
+  it('getTaskCount should get the count of macroTasks correctly', fakeAsync(() => {
+       const logs: any[] = [];
+       setTimeout(() => {logs.push('timeout1')}, 100);
+       setTimeout(() => {logs.push('timeout2')}, 200);
+       setInterval(() => {logs.push('interval')}, 100);
+       Promise.resolve().then(_ => logs.push('promise'));
+       expect(logs).toEqual([]);
+       expect(getTaskCount()).toEqual(4);
+       expect(getTaskCount('macroTask')).toEqual(2);
+       expect(getTaskCount('periodicTask')).toEqual(1);
+       expect(getTaskCount('microTask')).toEqual(1);
+       discardAllTasks();
+     }));
 }
