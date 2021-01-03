@@ -6,7 +6,12 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-(function(global: any) {
+interface FakeAsyncTickOptions {
+   processNewMacroTasksSynchronously: boolean
+}
+
+type FakeAsyncDoTickCallback = (elasped: number) => void;
+
 interface ScheduledFunction {
   endTime: number;
   id: number;
@@ -29,6 +34,32 @@ interface MacroTaskOptions {
   callbackArgs?: any;
 }
 
+interface FakeAsyncTestSpecType extends ZoneSpec {
+  getCurrentTickTime: () => number;
+  getFakeSystemTime: () => number;
+  setFakeBaseSystemTime: (realTime: number) => void;
+  getRealSystemTime: () => number;
+
+  lockDatePatch: () => void;
+  unlockDatePatch: () => void;
+  tickToNext: (steps?: number, doTick?: FakeAsyncDoTickCallback, tickOptions?: FakeAsyncTickOptions) => void;
+  tick(millis?: number, doTick?: FakeAsyncDoTickCallback, tickOptions?: FakeAsyncTickOptions): void;
+  flushMicrotasks: () => void;
+
+  flush: (limit?: number, flushPeriodic?: boolean, doTick?: FakeAsyncDoTickCallback)=> number;
+
+  flushOnlyPendingTimers: (doTick?: FakeAsyncDoTickCallback) =>number;
+
+  removeAllTimers: () => void;
+
+  getTimerCount: () => number;
+
+  pendingPeriodicTimers: number[];
+  pendingTimers: number[];
+  _microtasks: MicroTaskScheduledFunction[];
+}
+
+(function(global: any) {
 const OriginalDate = global.Date;
 // Since when we compile this file to `es2015`, and if we define
 // this `FakeDate` as `class FakeDate`, and then set `FakeDate.prototype`
@@ -304,19 +335,60 @@ class Scheduler {
   }
 }
 
-class FakeAsyncTestZoneSpec implements ZoneSpec {
-  static assertInZone(): void {
-    if (Zone.current.get('FakeAsyncTestZoneSpec') == null) {
-      throw new Error('The code should be running in the fakeAsync zone to call this function');
+function assertInZone(): void {
+  if (Zone.current.get('FakeAsyncTestZoneSpec') == null) {
+    throw new Error('The code should be running in the fakeAsync zone to call this function');
+  }
+}
+
+  function patchDate() {
+    if (!!global[Zone.__symbol__('disableDatePatching')]) {
+      // we don't want to patch global Date
+      // because in some case, global Date
+      // is already being patched, we need to provide
+      // an option to let user still use their
+      // own version of Date.
+      return;
+    }
+
+    if (global['Date'] === FakeDate) {
+      // already patched
+      return;
+    }
+    global['Date'] = FakeDate;
+    FakeDate.prototype = OriginalDate.prototype;
+
+    // try check and reset timers
+    // because jasmine.clock().install() may
+    // have replaced the global timer
+    checkTimerPatch();
+  }
+
+  function resetDate() {
+    if (global['Date'] === FakeDate) {
+      global['Date'] = OriginalDate;
     }
   }
 
+  function checkTimerPatch() {
+    if (global.setTimeout !== timers.setTimeout) {
+      global.setTimeout = timers.setTimeout;
+      global.clearTimeout = timers.clearTimeout;
+    }
+    if (global.setInterval !== timers.setInterval) {
+      global.setInterval = timers.setInterval;
+      global.clearInterval = timers.clearInterval;
+    }
+  }
+
+
+class FakeAsyncTestZoneSpec implements FakeAsyncTestSpecType {
   private _scheduler: Scheduler = new Scheduler();
-  private _microtasks: MicroTaskScheduledFunction[] = [];
   private _lastError: Error|null = null;
   private _uncaughtPromiseErrors: {rejection: any}[] =
       (Promise as any)[(Zone as any).__symbol__('uncaughtPromiseErrors')];
 
+  _microtasks: MicroTaskScheduledFunction[] = [];
   pendingPeriodicTimers: number[] = [];
   pendingTimers: number[] = [];
 
@@ -354,7 +426,7 @@ class FakeAsyncTestZoneSpec implements ZoneSpec {
     };
   }
 
-  private static _removeTimer(timers: number[], id: number): void {
+   static _removeTimer(timers: number[], id: number): void {
     let index = timers.indexOf(id);
     if (index > -1) {
       timers.splice(index, 1);
@@ -433,61 +505,22 @@ class FakeAsyncTestZoneSpec implements ZoneSpec {
     return this._scheduler.getFakeSystemTime();
   }
 
-  setFakeBaseSystemTime(realTime: number) {
-    this._scheduler.setFakeBaseSystemTime(realTime);
+  setFakeBaseSystemTime(fakeBaseSystemTime: number) {
+    this._scheduler.setFakeBaseSystemTime(fakeBaseSystemTime);
   }
 
   getRealSystemTime() {
     return this._scheduler.getRealSystemTime();
   }
 
-  static patchDate() {
-    if (!!global[Zone.__symbol__('disableDatePatching')]) {
-      // we don't want to patch global Date
-      // because in some case, global Date
-      // is already being patched, we need to provide
-      // an option to let user still use their
-      // own version of Date.
-      return;
-    }
-
-    if (global['Date'] === FakeDate) {
-      // already patched
-      return;
-    }
-    global['Date'] = FakeDate;
-    FakeDate.prototype = OriginalDate.prototype;
-
-    // try check and reset timers
-    // because jasmine.clock().install() may
-    // have replaced the global timer
-    FakeAsyncTestZoneSpec.checkTimerPatch();
-  }
-
-  static resetDate() {
-    if (global['Date'] === FakeDate) {
-      global['Date'] = OriginalDate;
-    }
-  }
-
-  static checkTimerPatch() {
-    if (global.setTimeout !== timers.setTimeout) {
-      global.setTimeout = timers.setTimeout;
-      global.clearTimeout = timers.clearTimeout;
-    }
-    if (global.setInterval !== timers.setInterval) {
-      global.setInterval = timers.setInterval;
-      global.clearInterval = timers.clearInterval;
-    }
-  }
-
   lockDatePatch() {
     this.patchDateLocked = true;
-    FakeAsyncTestZoneSpec.patchDate();
+    patchDate();
   }
+
   unlockDatePatch() {
     this.patchDateLocked = false;
-    FakeAsyncTestZoneSpec.resetDate();
+    resetDate();
   }
 
   tickToNext(steps: number = 1, doTick?: (elapsed: number) => void, tickOptions: {
@@ -496,7 +529,7 @@ class FakeAsyncTestZoneSpec implements ZoneSpec {
     if (steps <= 0) {
       return;
     }
-    FakeAsyncTestZoneSpec.assertInZone();
+    assertInZone();
     this.flushMicrotasks();
     this._scheduler.tickToNext(steps, doTick, tickOptions);
     if (this._lastError !== null) {
@@ -507,7 +540,7 @@ class FakeAsyncTestZoneSpec implements ZoneSpec {
   tick(millis: number = 0, doTick?: (elapsed: number) => void, tickOptions: {
     processNewMacroTasksSynchronously: boolean
   } = {processNewMacroTasksSynchronously: true}): void {
-    FakeAsyncTestZoneSpec.assertInZone();
+    assertInZone();
     this.flushMicrotasks();
     this._scheduler.tick(millis, doTick, tickOptions);
     if (this._lastError !== null) {
@@ -516,7 +549,7 @@ class FakeAsyncTestZoneSpec implements ZoneSpec {
   }
 
   flushMicrotasks(): void {
-    FakeAsyncTestZoneSpec.assertInZone();
+    assertInZone();
     const flushErrors = () => {
       if (this._lastError !== null || this._uncaughtPromiseErrors.length) {
         // If there is an error stop processing the microtask queue and rethrow the error.
@@ -531,7 +564,7 @@ class FakeAsyncTestZoneSpec implements ZoneSpec {
   }
 
   flush(limit?: number, flushPeriodic?: boolean, doTick?: (elapsed: number) => void): number {
-    FakeAsyncTestZoneSpec.assertInZone();
+    assertInZone();
     this.flushMicrotasks();
     const elapsed = this._scheduler.flush(limit, flushPeriodic, doTick);
     if (this._lastError !== null) {
@@ -541,7 +574,7 @@ class FakeAsyncTestZoneSpec implements ZoneSpec {
   }
 
   flushOnlyPendingTimers(doTick?: (elapsed: number) => void): number {
-    FakeAsyncTestZoneSpec.assertInZone();
+    assertInZone();
     this.flushMicrotasks();
     const elapsed = this._scheduler.flushOnlyPendingTimers(doTick);
     if (this._lastError !== null) {
@@ -551,7 +584,7 @@ class FakeAsyncTestZoneSpec implements ZoneSpec {
   }
 
   removeAllTimers() {
-    FakeAsyncTestZoneSpec.assertInZone();
+    assertInZone();
     this._scheduler.removeAll();
     this.pendingPeriodicTimers = [];
     this.pendingTimers = [];
@@ -670,11 +703,11 @@ class FakeAsyncTestZoneSpec implements ZoneSpec {
       delegate: ZoneDelegate, current: Zone, target: Zone, callback: Function, applyThis: any,
       applyArgs?: any[], source?: string): any {
     try {
-      FakeAsyncTestZoneSpec.patchDate();
+      patchDate();
       return delegate.invoke(target, callback, applyThis, applyArgs, source);
     } finally {
       if (!this.patchDateLocked) {
-        FakeAsyncTestZoneSpec.resetDate();
+        resetDate();
       }
     }
   }
@@ -714,7 +747,7 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
     return Zone && (Zone as any)['ProxyZoneSpec'];
   }
 
-  let _fakeAsyncTestZoneSpec: any = null;
+  let _fakeAsyncTestZoneSpec: FakeAsyncTestSpecType | null = null;
 
   /**
    * Clears out the shared fake async zone for a test.
@@ -774,8 +807,8 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
 
         let res: any;
         const lastProxyZoneSpec = proxyZoneSpec.getDelegate();
-        proxyZoneSpec.setDelegate(_fakeAsyncTestZoneSpec);
-        _fakeAsyncTestZoneSpec.lockDatePatch();
+        proxyZoneSpec.setDelegate(_fakeAsyncTestZoneSpec!);
+        _fakeAsyncTestZoneSpec!.lockDatePatch();
         try {
           res = fn.apply(this, args);
           flushMicrotasks();
@@ -783,15 +816,15 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
           proxyZoneSpec.setDelegate(lastProxyZoneSpec);
         }
 
-        if (_fakeAsyncTestZoneSpec.pendingPeriodicTimers.length > 0) {
+        if (_fakeAsyncTestZoneSpec!.pendingPeriodicTimers.length > 0) {
           throw new Error(
-              `${_fakeAsyncTestZoneSpec.pendingPeriodicTimers.length} ` +
+              `${_fakeAsyncTestZoneSpec!.pendingPeriodicTimers.length} ` +
               `periodic timer(s) still in the queue.`);
         }
 
-        if (_fakeAsyncTestZoneSpec.pendingTimers.length > 0) {
+        if (_fakeAsyncTestZoneSpec!.pendingTimers.length > 0) {
           throw new Error(
-              `${_fakeAsyncTestZoneSpec.pendingTimers.length} timer(s) still in the queue.`);
+              `${_fakeAsyncTestZoneSpec!.pendingTimers.length} timer(s) still in the queue.`);
         }
         return res;
       } finally {
@@ -802,7 +835,7 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
     return fakeAsyncFn;
   }
 
-  function _getFakeAsyncZoneSpec(): any {
+  function _getFakeAsyncZoneSpec(): FakeAsyncTestSpecType {
     if (_fakeAsyncTestZoneSpec == null) {
       _fakeAsyncTestZoneSpec = Zone.current.get('FakeAsyncTestZoneSpec');
       if (_fakeAsyncTestZoneSpec == null) {
@@ -825,7 +858,7 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
    * @experimental
    */
   function tick(millis: number = 0, ignoreNestedTimeout = false): void {
-    _getFakeAsyncZoneSpec().tick(millis, null, ignoreNestedTimeout);
+    _getFakeAsyncZoneSpec().tick(millis, undefined, {processNewMacroTasksSynchronously: ignoreNestedTimeout});
   }
 
   /**
@@ -840,6 +873,85 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
    */
   function flush(maxTurns?: number): number {
     return _getFakeAsyncZoneSpec().flush(maxTurns);
+  }
+
+  /**
+   * set fake system time, in millis.
+   *
+   * @experimental
+   */
+  function setFakeSystemTime(time: number): void {
+    const zoneSpec = _getFakeAsyncZoneSpec();
+    zoneSpec.setFakeBaseSystemTime(time);
+  }
+
+  /**
+   * get fake system time, in millis.
+   *
+   * @experimental
+   */
+  function getFakeSystemTime(): number {
+    const zoneSpec = _getFakeAsyncZoneSpec();
+    return zoneSpec.getFakeSystemTime();
+  }
+
+  /**
+   * get underlying native system time, in millis.
+   *
+   * @experimental
+   */
+  function getRealSystemTime(): number {
+    const zoneSpec = _getFakeAsyncZoneSpec();
+    return zoneSpec.getRealSystemTime();
+  }
+
+  /**
+   * set underlying native system time, in millis.
+   *
+   * @experimental
+   */
+  function flushOnlyPendingTasks(): void {
+    const zoneSpec = _getFakeAsyncZoneSpec();
+    zoneSpec.flushOnlyPendingTimers();
+  }
+
+  /**
+   * tick to the next timer.
+   *
+   * @param steps, the steps tick to, by default is 1, the steps parameter can not < 1.
+   *
+   * @experimental
+   */
+  function tickToNext(steps: number): void {
+    const zoneSpec = _getFakeAsyncZoneSpec();
+    zoneSpec.tickToNext(steps);
+  }
+
+  /**
+   * Discard all tasks.
+   *
+   * @experimental
+   */
+  function discardAllTasks(): void {
+    const zoneSpec = _getFakeAsyncZoneSpec();
+    zoneSpec.removeAllTimers();
+  }
+
+  /**
+   * get the count of task.
+   *
+   * @experimental
+   */
+  function getTaskCount(type?: 'microTask'|'macroTask'|'periodicTask'): number {
+    const zoneSpec = _getFakeAsyncZoneSpec();
+    if (type === 'microTask') {
+      return zoneSpec._microtasks.length;
+    } else if (type === 'macroTask') {
+      return zoneSpec.pendingTimers.length;
+    } else if (type === 'periodicTask') {
+      return zoneSpec.pendingPeriodicTimers.length;
+    }
+    return zoneSpec.getTimerCount();
   }
 
   /**
@@ -861,6 +973,20 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
   function flushMicrotasks(): void {
     _getFakeAsyncZoneSpec().flushMicrotasks();
   }
-  (Zone as any)[api.symbol('fakeAsyncTest')] =
-      {resetFakeAsyncZone, flushMicrotasks, discardPeriodicTasks, tick, flush, fakeAsync};
-}, true);
+
+  (Zone as any)[api.symbol('fakeAsyncTest')] = {
+    resetFakeAsyncZone,
+    flushMicrotasks,
+    discardPeriodicTasks,
+    tick,
+    flush,
+    fakeAsync,
+    setFakeSystemTime,
+    getFakeSystemTime,
+    getRealSystemTime,
+    flushOnlyPendingTasks,
+    tickToNext,
+    discardAllTasks,
+    getTaskCount
+  };
+});
