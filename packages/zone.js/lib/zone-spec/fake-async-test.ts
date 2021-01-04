@@ -10,7 +10,7 @@ interface FakeAsyncTickOptions {
    processNewMacroTasksSynchronously: boolean
 }
 
-type FakeAsyncDoTickCallback = (elasped: number) => void;
+type FakeAsyncDoTickCallback = (elapsed: number) => void;
 
 interface ScheduledFunction {
   endTime: number;
@@ -187,7 +187,7 @@ class Scheduler {
     return this._schedulerQueue.length;
   }
 
-  tickToNext(step: number = 1, doTick?: (elapsed: number) => void, tickOptions?: {
+  tickToNext(step: number = 1, doTick?: FakeAsyncDoTickCallback, tickOptions?: {
     processNewMacroTasksSynchronously: boolean
   }) {
     if (this._schedulerQueue.length < step) {
@@ -200,7 +200,7 @@ class Scheduler {
     this.tick(targetTask.endTime - startTime, doTick, tickOptions);
   }
 
-  tick(millis: number = 0, doTick?: (elapsed: number) => void, tickOptions?: {
+  tick(millis: number = 0, doTick?: FakeAsyncDoTickCallback, tickOptions?: {
     processNewMacroTasksSynchronously: boolean
   }): void {
     let finalTime = this._currentTickTime + millis;
@@ -523,7 +523,7 @@ class FakeAsyncTestZoneSpec implements FakeAsyncTestSpecType {
     resetDate();
   }
 
-  tickToNext(steps: number = 1, doTick?: (elapsed: number) => void, tickOptions: {
+  tickToNext(steps: number = 1, doTick?: FakeAsyncDoTickCallback, tickOptions: {
     processNewMacroTasksSynchronously: boolean
   } = {processNewMacroTasksSynchronously: true}): void {
     if (steps <= 0) {
@@ -537,7 +537,7 @@ class FakeAsyncTestZoneSpec implements FakeAsyncTestSpecType {
     }
   }
 
-  tick(millis: number = 0, doTick?: (elapsed: number) => void, tickOptions: {
+  tick(millis: number = 0, doTick?: FakeAsyncDoTickCallback, tickOptions: {
     processNewMacroTasksSynchronously: boolean
   } = {processNewMacroTasksSynchronously: true}): void {
     assertInZone();
@@ -563,7 +563,7 @@ class FakeAsyncTestZoneSpec implements FakeAsyncTestSpecType {
     flushErrors();
   }
 
-  flush(limit?: number, flushPeriodic?: boolean, doTick?: (elapsed: number) => void): number {
+  flush(limit?: number, flushPeriodic?: boolean, doTick?: FakeAsyncDoTickCallback): number {
     assertInZone();
     this.flushMicrotasks();
     const elapsed = this._scheduler.flush(limit, flushPeriodic, doTick);
@@ -573,7 +573,7 @@ class FakeAsyncTestZoneSpec implements FakeAsyncTestSpecType {
     return elapsed;
   }
 
-  flushOnlyPendingTimers(doTick?: (elapsed: number) => void): number {
+  flushOnlyPendingTimers(doTick?: FakeAsyncDoTickCallback): number {
     assertInZone();
     this.flushMicrotasks();
     const elapsed = this._scheduler.flushOnlyPendingTimers(doTick);
