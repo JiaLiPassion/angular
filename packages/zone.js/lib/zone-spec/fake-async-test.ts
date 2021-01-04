@@ -37,7 +37,7 @@ interface MacroTaskOptions {
 interface FakeAsyncTestSpecType extends ZoneSpec {
   getCurrentTickTime: () => number;
   getFakeSystemTime: () => number;
-  setFakeBaseSystemTime: (realTime: number) => void;
+  setFakeSystemTime: (fakeSystemTime: number) => void;
   getRealSystemTime: () => number;
 
   lockDatePatch: () => void;
@@ -118,8 +118,13 @@ class Scheduler {
     return this._currentFakeBaseSystemTime + this._currentTickTime;
   }
 
-  setFakeBaseSystemTime(fakeBaseSystemTime: number) {
-    this._currentFakeBaseSystemTime = fakeBaseSystemTime;
+  setFakeSystemTime(fakeSystemTime: number) {
+    // Set current fake base system time to the specified time
+    this._currentFakeBaseSystemTime = fakeSystemTime;
+    // Since we need to reset _currentTickTime, we need to
+    // apply the diff to all endTime of the current remaining tasks.
+    this._schedulerQueue.forEach(queueItem => queueItem.endTime = queueItem.endTime - this._currentTickTime);
+    this._currentTickTime = 0;
   }
 
   getRealSystemTime() {
@@ -505,8 +510,8 @@ class FakeAsyncTestZoneSpec implements FakeAsyncTestSpecType {
     return this._scheduler.getFakeSystemTime();
   }
 
-  setFakeBaseSystemTime(fakeBaseSystemTime: number) {
-    this._scheduler.setFakeBaseSystemTime(fakeBaseSystemTime);
+  setFakeSystemTime(fakeSystemTime: number) {
+    this._scheduler.setFakeSystemTime(fakeSystemTime);
   }
 
   getRealSystemTime() {
@@ -874,7 +879,7 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
    */
   function setFakeSystemTime(time: number): void {
     const zoneSpec = _getFakeAsyncZoneSpec();
-    zoneSpec.setCurrentRealTime(time);
+    zoneSpec.setFakeSystemTime(time);
   }
 
   /**
