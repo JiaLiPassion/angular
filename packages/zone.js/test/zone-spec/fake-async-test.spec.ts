@@ -38,6 +38,10 @@ describe('FakeAsyncTestZoneSpec', () => {
     fakeAsyncTestZone = Zone.current.fork(testZoneSpec);
   });
 
+  it('should be able to get FakeAsyncTestZoneSpec from Zone correctly', () => {
+    expect(Zone.getFakeAsyncZoneSpec!()).toEqual(FakeAsyncTestZoneSpec);
+  });
+
   it('sets the FakeAsyncTestZoneSpec property', () => {
     fakeAsyncTestZone.run(() => {
       expect(Zone.current.get('FakeAsyncTestZoneSpec')).toEqual(testZoneSpec);
@@ -1238,8 +1242,24 @@ const ProxyZoneSpec: {assertPresent: () => void} = (Zone as any)['ProxyZoneSpec'
 const fakeAsyncTestModule = (Zone as any)[Zone.__symbol__('fakeAsyncTest')];
 const {fakeAsync, tick, discardPeriodicTasks, flush, flushMicrotasks} = fakeAsyncTestModule;
 
+const fakeAsyncTest = Zone.getFakeAsyncTest!();
+
 {
   describe('fake async', () => {
+    it('getFakeAsyncTest should return fakeAsyncTest functions', () => {
+      expect(fakeAsyncTest.resetFakeAsyncZone).toEqual(fakeAsyncTestModule.resetFakeAsyncZone);
+      expect(fakeAsyncTest.discardAllTasks).toEqual(fakeAsyncTestModule.discardAllTasks);
+      expect(fakeAsyncTest.discardPeriodicTasks).toEqual(fakeAsyncTestModule.discardPeriodicTasks);
+      expect(fakeAsyncTest.flush).toEqual(fakeAsyncTestModule.flush);
+      expect(fakeAsyncTest.flushMicrotasks).toEqual(fakeAsyncTestModule.flushMicroTasks);
+      expect(fakeAsyncTest.flushOnlyPendingTasks).toEqual(fakeAsyncTestModule.flushOnlyPendingTasks);
+      expect(fakeAsyncTest.getFakeSystemTime).toEqual(fakeAsyncTestModule.getFakeSystemTime);
+      expect(fakeAsyncTest.setFakeSystemTime).toEqual(fakeAsyncTestModule.setFakeSystemTime);
+      expect(fakeAsyncTest.getTaskCount).toEqual(fakeAsyncTestModule.getTaskCount);
+      expect(fakeAsyncTest.tick).toEqual(fakeAsyncTestModule.tick);
+      expect(fakeAsyncTest.tickToNext).toEqual(fakeAsyncTestModule.tickToNext);
+    });
+
     it('should run synchronous code', () => {
       let ran = false;
       fakeAsync(() => {

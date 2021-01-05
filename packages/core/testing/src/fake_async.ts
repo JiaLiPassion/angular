@@ -5,11 +5,12 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-const _Zone: any = typeof Zone !== 'undefined' ? Zone : null;
-const fakeAsyncTestModule = _Zone && _Zone[_Zone.__symbol__('fakeAsyncTest')];
+const _Zone: ZoneType|null = typeof Zone !== 'undefined' ? Zone : null;
+const fakeAsyncTestModule =
+    _Zone && typeof _Zone.getFakeAsyncTest === 'function' && _Zone.getFakeAsyncTest!();
 
 const fakeAsyncTestModuleNotLoadedErrorMessage =
-    `zone-testing.js is needed for the async() test helper but could not be found.
+    `zone-testing.js is needed for the fakeAsync() test helper but could not be found.
         Please make sure that your environment includes zone.js/dist/zone-testing.js`;
 
 /**
@@ -44,7 +45,8 @@ export function resetFakeAsyncZone(): void {
  *
  * @publicApi
  */
-export function fakeAsync(fn: Function): (...args: any[]) => any {
+export function fakeAsync<F extends(...args: any[]) => any>(fn: F): (...args: Parameters<F>) =>
+    ReturnType<F> {
   if (fakeAsyncTestModule) {
     return fakeAsyncTestModule.fakeAsync(fn);
   }
@@ -188,8 +190,7 @@ export function setFakeSystemTime(time: number): void {
   if (fakeAsyncTestModule && typeof fakeAsyncTestModule.setFakeSystemTime === 'function') {
     return fakeAsyncTestModule.setFakeSystemTime(time);
   } else {
-    console.warn(
-        'setFakeSystemTime() function is not available, this feature require zone.js 0.11.2+, please upgrade zone.js and try again.');
+    throw new Error(fakeAsyncTestModuleNotLoadedErrorMessage);
   }
 }
 
@@ -203,12 +204,11 @@ export function setFakeSystemTime(time: number): void {
  *
  * @publicApi
  */
-export function getFakeSystemTime(): void {
+export function getFakeSystemTime(): number {
   if (fakeAsyncTestModule && typeof fakeAsyncTestModule.getFakeSystemTime === 'function') {
     return fakeAsyncTestModule.getFakeSystemTime();
   } else {
-    console.warn(
-        'getFakeSystemTime() function is not available, this feature require zone.js 0.11.2+, please upgrade zone.js and try again.');
+    throw new Error(fakeAsyncTestModuleNotLoadedErrorMessage);
   }
 }
 
@@ -221,12 +221,11 @@ export function getFakeSystemTime(): void {
  *
  * @publicApi
  */
-export function getRealSystemTime(): void {
+export function getRealSystemTime(): number {
   if (fakeAsyncTestModule && typeof fakeAsyncTestModule.getRealSystemTime === 'function') {
     return fakeAsyncTestModule.getRealSystemTime();
   } else {
-    console.warn(
-        'getRealSystemTime() function is not available, this feature require zone.js 0.11.2+, please upgrade zone.js and try again.');
+    throw new Error(fakeAsyncTestModuleNotLoadedErrorMessage);
   }
 }
 
@@ -253,11 +252,10 @@ export function getRealSystemTime(): void {
  * @publicApi
  */
 export function flushOnlyPendingTasks(): void {
-  if (fakeAsyncTestModule && typeof fakeAsyncTestModule.flushOnlyPendingTimers === 'function') {
+  if (fakeAsyncTestModule && typeof fakeAsyncTestModule.flushOnlyPendingTasks === 'function') {
     return fakeAsyncTestModule.flushOnlyPendingTasks();
   } else {
-    console.warn(
-        'flushOnlyPendingTasks() function is not available, this feature require zone.js 0.11.2+, please upgrade zone.js and try again.');
+    throw new Error(fakeAsyncTestModuleNotLoadedErrorMessage);
   }
 }
 
@@ -295,8 +293,7 @@ export function tickToNext(steps = 1): void {
   if (fakeAsyncTestModule && typeof fakeAsyncTestModule.tickToNext === 'function') {
     return fakeAsyncTestModule.tickToNext(steps);
   } else {
-    console.warn(
-        'tickToNext() function is not available, this feature require zone.js 0.11.2+, please upgrade zone.js and try again.');
+    throw new Error(fakeAsyncTestModuleNotLoadedErrorMessage);
   }
 }
 
@@ -307,12 +304,11 @@ export function tickToNext(steps = 1): void {
  *
  * @publicApi
  */
-export function removeAllTasks(): void {
-  if (fakeAsyncTestModule && typeof fakeAsyncTestModule.removeAllTimers === 'function') {
-    return fakeAsyncTestModule.removeAllTasks();
+export function discardAllTasks(): void {
+  if (fakeAsyncTestModule && typeof fakeAsyncTestModule.discardAllTasks === 'function') {
+    return fakeAsyncTestModule.discardAllTasks();
   } else {
-    console.warn(
-        'removeAllTasks() function is not available, this feature require zone.js 0.11.2+, please upgrade zone.js and try again.');
+    throw new Error(fakeAsyncTestModuleNotLoadedErrorMessage);
   }
 }
 
@@ -329,11 +325,10 @@ export function removeAllTasks(): void {
  *
  * @publicApi
  */
-export function getTaskCount(taskType?: 'macroTask'|'microTask'|'periodicTask'): void {
-  if (fakeAsyncTestModule && typeof fakeAsyncTestModule.getTimerCount === 'function') {
+export function getTaskCount(taskType?: 'macroTask'|'microTask'|'periodicTask'): number {
+  if (fakeAsyncTestModule && typeof fakeAsyncTestModule.getTaskCount === 'function') {
     return fakeAsyncTestModule.getTaskCount(taskType);
   } else {
-    console.warn(
-        'getTaskCount() function is not available, this feature require zone.js 0.11.2+, please upgrade zone.js and try again.');
+    throw new Error(fakeAsyncTestModuleNotLoadedErrorMessage);
   }
 }
