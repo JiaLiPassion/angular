@@ -1733,7 +1733,7 @@ const {fakeAsync, tick, discardPeriodicTasks, flush, flushMicrotasks} = fakeAsyn
       }
 
       increase() {
-        this.counter ++;
+        this.counter++;
       }
 
       reset() {
