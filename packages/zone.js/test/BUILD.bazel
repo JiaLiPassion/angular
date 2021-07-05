@@ -65,6 +65,20 @@ ts_library(
 )
 
 ts_library(
+    name = "native_await_spec_srcs",
+    testonly = True,
+    srcs = [
+        "native/native-async-await.spec.ts",
+    ],
+    devmode_target = "es2020",
+    tsconfig = "//packages/zone.js:tsconfig.native.json",
+    deps = [
+        ":node_native_await_transpile_entry_point",
+        "//packages/zone.js/lib:lib_es2020",
+    ],
+)
+
+ts_library(
     name = "test_node_lib",
     testonly = True,
     srcs = glob(["node/*.ts"]) + [
@@ -168,6 +182,16 @@ ts_library(
 )
 
 ts_library(
+    name = "node_native_await_transpile_entry_point",
+    testonly = True,
+    srcs = ["node_native_await_transpile_entry_point.ts"],
+    devmode_target = "es2020",
+    deps = [
+        "//packages/zone.js/lib:lib_es2020",
+    ],
+)
+
+ts_library(
     name = "node_error_lazy_policy_entry_point",
     testonly = True,
     srcs = ["node_error_lazy_policy_entry_point.ts"],
@@ -230,6 +254,11 @@ jasmine_node_test(
         "//packages/zone.js:npm_package",
         "@npm//shelljs",
     ],
+)
+
+jasmine_node_test(
+    name = "test_node_native_await_transpile",
+    deps = [":native_await_spec_srcs"],
 )
 
 env_srcs = [

@@ -29,3 +29,34 @@ ts_library(
         "@npm//tslib",
     ],
 )
+
+ts_library(
+    name = "zone_d_ts_es2020",
+    srcs = [":zone.ts"],
+    devmode_target = "es2020",
+    tsconfig = "//packages/zone.js:tsconfig.native.json",
+    deps = [
+        "@npm//@types/node",
+    ],
+)
+
+ts_library(
+    name = "lib_es2020",
+    srcs = glob(
+        ["**/*.ts"],
+        exclude = [
+            "zone.ts",
+            "zone-global.d.ts",
+        ],
+    ),
+    devmode_target = "es2020",
+    module_name = "zone.js/lib",
+    tsconfig = "//packages/zone.js:tsconfig.native.json",
+    deps = [
+        ":zone_d_ts_es2020",
+        "@npm//@types/jasmine",
+        "@npm//@types/node",
+        "@npm//rxjs",
+        "@npm//tslib",
+    ],
+)

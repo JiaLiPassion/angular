@@ -4,6 +4,8 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "tsconfig-build.json",
+    "tsconfig-build-es2020.json",
+    "tsconfig-test-es2020.json",
     "tsconfig.json",
 ])
 
