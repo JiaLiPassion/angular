@@ -70,11 +70,12 @@ ts_library(
     srcs = [
         "native/native-async-await.spec.ts",
     ],
-    devmode_target = "es2020",
+    devmode_target = "es2017",
     tsconfig = "//packages/zone.js:tsconfig.native.json",
     deps = [
         ":node_native_await_transpile_entry_point",
-        "//packages/zone.js/lib:lib_es2020",
+        "//packages/zone.js/lib",
+        "//packages/zone.js/lib:awaiter",
     ],
 )
 
@@ -185,9 +186,10 @@ ts_library(
     name = "node_native_await_transpile_entry_point",
     testonly = True,
     srcs = ["node_native_await_transpile_entry_point.ts"],
-    devmode_target = "es2020",
+    devmode_target = "es2017",
     deps = [
-        "//packages/zone.js/lib:lib_es2020",
+        "//packages/zone.js/lib",
+        "//packages/zone.js/lib:awaiter",
     ],
 )
 

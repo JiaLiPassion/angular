@@ -1,6 +1,7 @@
 import '../node_native_await_transpile_entry_point';
 
 const logs: string[] = [];
+let handleError = false;
 const zone1 = Zone.current.fork({
   name: 'zone1',
   onScheduleTask: (delegate, curr, target, task) => {
@@ -17,7 +18,7 @@ const zone1 = Zone.current.fork({
   },
   onHandleError: (delegate, curr, target, error) => {
     logs.push(`zone1 handle error ${error.message}`);
-    return false;
+    return handleError;
   },
 });
 
@@ -94,6 +95,31 @@ const generatorTest2 = function*(options: {a: number; throwError: boolean} = {
   a++;
   a = yield computeAsync(a, options.throwError);
   logs.push(`after await2 ${Zone.current.name} ${a}`);
+  return a;
+};
+
+const generatorTest3 = function*(options: {a: number; throwError: boolean} = {
+  a: 0,
+  throwError: false
+}) {
+  let a = options.a;
+  a++;
+  logs.push(`before await ${Zone.current.name}`);
+  a = yield computeAsync(a);
+  logs.push(`after await1 ${Zone.current.name} ${a}`);
+  a++;
+  try {
+    a = yield computeAsync(a, options.throwError);
+  } catch (error) {
+    logs.push(`catch error ${error.message}`);
+  }
+  logs.push(`after await2 ${Zone.current.name} ${a}`);
+  a = yield computeAsync(a);
+  logs.push(`after await3 ${Zone.current.name} ${a}`);
+  a = yield computeAsync(a);
+  logs.push(`after await4 ${Zone.current.name} ${a}`);
+  a = yield computeAsync(a);
+  logs.push(`after await5 ${Zone.current.name} ${a}`);
   return a;
 };
 
@@ -190,6 +216,7 @@ describe('native async/await', () => {
             'zone1 invoke native await',
             'zone1 handle error throw error in async function',
             'zone1 invoke native await',
+            'zone1 invoke native await',
           ]);
           done();
         });
@@ -277,6 +304,7 @@ describe('native async/await', () => {
             'zone1 invoke task setTimeout',
             'zone1 invoke native await',
             'zone1 handle error throw error in promise',
+            'zone1 invoke native await',
             'zone1 invoke native await',
           ]);
           done();
@@ -369,6 +397,7 @@ describe('native async/await', () => {
             'zone1 invoke native await',
             'zone1 handle error throw error in async function',
             'zone1 invoke native await',
+            'zone1 invoke native await',
             'before await zone1',
             'zone1 schedule task setTimeout',
             'zone1 invoke task setTimeout',
@@ -379,10 +408,39 @@ describe('native async/await', () => {
             'zone1 invoke native await',
             'zone1 handle error throw error in promise',
             'zone1 invoke native await',
+            'zone1 invoke native await',
           ]);
           done();
         });
       });
     });
+
+    it('should trigger zone onHandleError and continue to invoke the following await',
+       (done: DoneFn) => {
+         handleError = true;
+         zone1.runGuarded(function() {
+           Zone.__awaiter(undefined, [], function*() {
+             const r = yield Zone.__awaiter(undefined, [{a: 1, throwError: true}], generatorTest3);
+             expect(r).toBe(5);
+             expect(Zone.current.name).toEqual(zone1.name);
+             expect(logs).toEqual([
+               'zone1 invoke undefined',         'before await zone1',
+               'zone1 schedule task setTimeout', 'zone1 invoke task setTimeout',
+               'zone1 invoke native await',      'after await1 zone1 3',
+               'zone1 schedule task setTimeout', 'zone1 invoke task setTimeout',
+               'zone1 invoke native await',      'catch error throw error in promise',
+               'after await2 zone1 4',           'zone1 schedule task setTimeout',
+               'zone1 invoke native await',      'after await3 zone1 3',
+               'zone1 schedule task setTimeout', 'zone1 invoke task setTimeout',
+               'zone1 invoke task setTimeout',   'zone1 invoke native await',
+               'after await4 zone1 4',           'zone1 schedule task setTimeout',
+               'zone1 invoke task setTimeout',   'zone1 invoke native await',
+               'after await5 zone1 5',           'zone1 invoke native await',
+             ]);
+             handleError = false;
+             done();
+           });
+         });
+       });
   });
 });

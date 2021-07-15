@@ -12,3 +12,4 @@ import '../lib/zone';
 import '../lib/common/promise';
 import '../lib/common/to-string';
 import '../lib/node/node';
+import '../lib/awaiter/zone.native.awaiter';

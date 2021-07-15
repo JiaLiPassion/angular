@@ -864,3 +864,32 @@ Zone.__load_patch('fakeasync', (global: any, Zone: ZoneType, api: _ZonePrivate) 
   (Zone as any)[api.symbol('fakeAsyncTest')] =
       {resetFakeAsyncZone, flushMicrotasks, discardPeriodicTasks, tick, flush, fakeAsync};
 }, true);
+
+Zone.__load_patch(
+    'fake_async_awaiter',
+    (global, Zone, api) => {
+        // api.__awaiter = function(thisArg, _arguments, generator) {
+        //   const gen = generator.apply(thisArg, _arguments);
+        //   function adopt(value: any) {
+        //     return (value && typeof value.then === 'function') ? value : new
+        //     Promise(function (resolve) { resolve(value); });
+        //   };
+
+        //   return new Promise(function (resolve, reject) {
+        //     function fulfilled(value: any) {
+        //       try { step(gen.next(value)); }
+        //       catch (e) { reject(e); }
+        //     };
+        //     function rejected(value: any) {
+        //       try {
+        //         step(gen.throw(value));
+        //       } catch (e) { reject(e); }
+        //     };
+        //     function step(result: any) {
+        //       result.done ? resolve(result.value) :
+        //         adopt(result.value).then(fulfilled, rejected);
+        //     };
+        //     step(gen.next());
+        //   });
+        // }
+    });

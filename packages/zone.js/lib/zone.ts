@@ -772,27 +772,10 @@ const Zone: ZoneType = (function(global: any) {
       }
     }
 
-    static async __awaiter<T>(thisArg: any, _arguments: any, generator: () => Generator<T>) {
-      const zone = Zone.current;
-      let gen: Generator|null = null;
-      try {
-        gen = generator.apply(thisArg, _arguments);
-        let res = gen.next();
-        const args = [await res.value];
-        while (!res.done) {
-          res = zone.run(gen.next, gen, args, 'native await');
-          args[0] = await res.value;
-        }
-        return args[0];
-      } catch (error) {
-        zone.runGuarded(() => {
-          if (gen) {
-            gen.throw(error);
-          } else {
-            throw error;
-          }
-        }, undefined, [], 'native await');
-      }
+    static __awaiter<T>(
+        thisArg: any, _arguments: any, generatorFactory: () => Generator<T|Promise<T>>): any {
+      throw new Error(
+          `Please import 'zone.js/awaiter' to use native async/await patch for Zone.js.`);
     };
 
     public get parent(): AmbientZone|null {
